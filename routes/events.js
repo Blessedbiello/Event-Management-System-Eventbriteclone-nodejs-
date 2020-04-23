@@ -6,9 +6,21 @@ const {
   updateEvent,
   deleteEvent,
 } = require("../controllers/events");
+
 const router = express.Router();
 
-router.route("/").get(getEvents).post(createEvent);
-router.route("/:id").get(getEvent).put(updateEvent).delete(deleteEvent);
+// Include other resource routers
+const { protect } = require("../middleware/auth");
+
+router
+.route("/")
+.get(getEvents)
+.post( createEvent);
+
+router
+.route("/:id")
+.get(getEvent)
+.put(protect, updateEvent)
+.delete(protect, deleteEvent);
 
 module.exports = router;
