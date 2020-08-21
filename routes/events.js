@@ -5,7 +5,7 @@ const {
   createEvent,
   updateEvent,
   deleteEvent,
-  getEventsByRadius,
+  getEventsByRadius
   
 } = require("../controllers/events");
 
@@ -14,15 +14,18 @@ const postRouter = require("./posts");
 
 const router = express.Router();
 
-// Re-route into other resource routers
-router.use("./:eventId/posts", postRouter);
-
-router.route("/radius/:zipcode/:distance").get(getEventsByRadius);
-
 // Include other resource routers
-const { protect } = require("../middleware/auth");
+const { protect, authorize } = require("../middleware/auth");
 
-router.route("/").get(getEvents).post(createEvent);
+// Re-route into other resource routers
+router.use("/:eventId/posts", postRouter);
+
+router.route("/radius/:zipcode/:distance").get(getEventsByRadius); 
+
+router 
+  .route("/")
+  .get(getEvents) 
+  .post(protect, authorize('user', 'admin'), createEvent);
 
 router
   .route("/:id")

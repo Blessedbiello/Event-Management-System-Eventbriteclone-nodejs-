@@ -43,6 +43,9 @@ exports.getEvent = asyncHandler(async (req, res, next) => {
 // @route POST /api/v1/events
 // @access  Private
 exports.createEvent = asyncHandler(async (req, res, next) => {
+  // Add user to req.body
+  req.body.user = req.user.id;
+
   const event = await Event.create(req.body);
 
   res.status(201).json({
@@ -55,16 +58,54 @@ exports.createEvent = asyncHandler(async (req, res, next) => {
 // @route PUT /api/v1/events
 // @access  Private
 exports.updateEvent = asyncHandler(async (req, res, next) => {
-  const event = await Event.findByIdAndUpdate(req.params.id, req.body, {
+  let event = await Event.findById(req.params.id);
+
+  if (!event) {
+    return next(
+      new ErrorResponse(`Event not found with id of ${req.params.id}`, 404)
+    );
+  }
+
+  // Make sure user is event owner
+  if (event.user.toString() !== req.user.id && req.user.role !== "admin") {
+    return next(
+      new ErrorResponse(
+        `User ${req.params.id} is not authorized to update this Event`,
+        401
+      )
+    );
+  }
+
+  event = await Event.findByIdAndUpdate(req.params.id, req.body, {
     new: true,
     runValidators: true,
   });
 
+  res.status(200).json({ success: true, data: event });
+});
+
+// @des Subscribe to an event
+// @route PUT /api/v1/events/:id/subscribe
+// @access  Private
+exports.subscribeEvent = asyncHandler(async (req, res, next) => {
+  let event = await Event.findById(req.params.id);
+
   if (!event) {
-    new ErrorResponse(`Resource not found with id of ${req.params.id}`, 404);
+    return next(
+      new ErrorResponse(`Event not found with id of ${req.params.id}`, 404)
+    );
   }
 
-  res.status(200).json({ success: true, data: event });
+  // Check if post has already been subscribed
+  if (event.subscribe.some((subscribe) => subscribe.user.toString() === req.user.id)) {
+    return next(new ErrorResponse(`Event already subscribed`, 400));
+  }
+
+  event.subscribe.unshift({ user: req.user.id });
+
+  await event.save();
+
+  return next(res.status(200).json({ success: true, data: event.subscribe }));
 });
 
 // @des Delete an event
@@ -76,6 +117,18 @@ exports.deleteEvent = asyncHandler(async (req, res, next) => {
   if (!event) {
     new ErrorResponse(`Resource not found with id of ${req.params.id}`, 404);
   }
+
+  // Make sure user is event owner
+  if (event.user.toString() !== req.user.id && req.user.role !== "admin") {
+    return next(
+      new ErrorResponse(
+        `User ${req.params.id} is not authorized to update this Event`,
+        401
+      )
+    );
+  }
+
+  event.remove();
 
   res.status(200).json({ success: true, data: {} });
 });
